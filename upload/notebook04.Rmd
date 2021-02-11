@@ -1,0 +1,401 @@
+---
+title: "Notebook 04"
+output: html_document
+---
+
+## Getting Started
+
+Before running this notebook, select "Session > Restart R and Clear Output" in
+the menu above to start a new R session. This will clear any old data sets and
+give us a blank slate to start with.
+
+After starting a new session, run the following code chunk to load the
+libraries and data that we will be working with today.
+
+
+```{r}
+#install.packages("topicmodels")
+```
+
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(cleanNLP)
+library(topicmodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+## State of the Union Data
+
+For this analysis we will be looking at the text from the State of the Union Addresses.
+The corpus includes nearly every Address; you can read the text of any address through
+the *American Presidency Project*'s website:
+
+   https://www.presidency.ucsb.edu/documents/presidential-documents-archive-guidebook/annual-messages-congress-the-state-the-union
+
+To start, let's read in the main table of data. Note: Do not try to open this table 
+directly as it may cause RStudio to crash.
+
+```{r, message = FALSE}
+doc <- read_csv(file.path("data", "sotu_document.csv.gz"))
+```
+
+Here are the first few rows of the dataset. Notice that all of the text is put in a
+single, final column.
+
+```{r}
+head(doc)
+```
+
+It will be useful to have just the metadata columns of the data, to allow us to easily
+look at them and join them into other datasets without slowing down RStudio. We do this
+with the following code:
+
+```{r}
+meta <- select(doc, -text)  # create new dataset that does not have the "text" variable
+```
+
+In order to do an analysis with the text data, we need to split apart the words and 
+add additional linguistic information. This would be time-consuming to do by hand,
+but we can quickly estimate this data using a pre-trained NLP model. (For more on NLP, 
+start here: https://en.wikipedia.org/wiki/Natural_language_processing). The code to do
+this in R is quite short and given the next block of code. The code is commented out
+because it can take 20-30 minutes to finish running. Instead, we can load a saved
+version of the data.
+
+```{r, message = FALSE}
+# cnlp_init_udpipe()
+# token <- cnlp_annotate(doc)$token
+````
+
+Instead of waiting for R to process the tokenized text, let's read in the data that
+would result from running the above code:
+
+```{r, message = FALSE}
+token <- read_csv(file.path("data", "sotu_token.csv.gz"))
+token
+```
+
+This dataset has one row per token (work or punctionation mark), along with data 
+representing information about the token. Specifically:
+
+  - doc_id: an identifier that maps into the table `meta`
+  - sid: counts the sentences in the text
+  - tid: gives an unique identifier for each token
+  - token: text of the token itself
+  - lemma: lemmatized version of the token (e.g., remove capitalization, makes all
+    nouns singular, all verbs in infinitive form), removes morphological forms
+  - upos: a "universal" part of speech (POS) code; mostly maps onto commonly taught
+    POS categories, such as ADJ (adjective), NOUN, PROPN (proper noun), and ADV (adverb)
+  - xpos: a more fine grained set of POS tags
+  - pct_doc: a number from 0-100 indicating the percentage into each document where
+    a word occurs
+    
+We will see several ways of studying the texts using the table of tokens in the following
+sections, which are broken down by method. Note that some of the code becomes a bit
+involved; try to focus on the ideas of each method rather than worrying too much about
+the specific functions being used.
+
+## Frequencies 
+
+One of the most straight-forward techniques for analyzing textual documents is to see 
+how frequently a specific lemma is used in the text. For this corpus, we can show the
+changes of these ratios over time to see if any interesting patterns emerge. Below
+we have the code to do this for detecting periods; feel free to look at other lemmas,
+which can be punctuation or individual words.
+
+```{r}
+lemma_to_count <- "."   # change this to look at different lemmas
+
+temp <- group_by(token, doc_id)
+temp <- summarize(temp, lemma_pct = mean(lemma == lemma_to_count) * 100)
+temp <- left_join(temp, meta, by = "doc_id")
+ggplot(temp, aes(year, lemma_pct)) +
+  geom_line()
+```
+For example, we can see that the sentences get shorter over time. Can you offer a hypothesis for why?
+
+
+Similarly, we can see what percentage of terms come from a specific POS tag.
+
+Before we explore, why might we be interested in POS?  
+
+```{r}
+pos_to_count <- "ADJ"   # try: NOUN, PROPN, ADJ, ADV, CONJ
+
+temp <- group_by(token, doc_id)
+temp <- summarize(temp, pos_pct = mean(upos == pos_to_count) * 100)
+temp <- left_join(temp, meta, by = "doc_id")
+ggplot(temp, aes(year, pos_pct)) +
+  geom_line()
+```
+
+
+
+## TF-IDF
+
+Sometimes we want the data to tell us what terms are important rather than assuming. 
+One method for doing this is term-frequency inverse document frequency (TF-IDF).
+The following code uses this method to summarize the "most important" terms in each document.
+
+```{r}
+temp <- filter(token, upos %in% c("NOUN", "ADJ", "ADV"))   # only look at nouns, adjectives, and adverbes
+temp <- sm_text_tfidf(temp)
+temp <- group_by(temp, doc_id)
+temp <- arrange(temp, desc(tfidf))
+temp <- slice_head(temp, n = 7)                            # show top 7 terms
+temp <- summarize(temp, top_terms = paste(token, collapse = "; "))
+temp <- ungroup(temp)
+temp <- left_join(temp, meta, by = "doc_id")
+temp <- select(temp, short_label, top_terms)
+temp
+```
+For example, we didn't include proper nouns because they will often be very unique. 
+They risk obscuring our ability to see larger themes.
+
+Make sure your screen is wide enough to show the results next to each short label. Feel free
+to change the number of top terms or adjust the parts of speech used in the analysis. If you
+see any interesting patterns, feel free to go back to the previous section and see if there 
+are overall temporal patterns as well.
+
+## Proper Nouns
+
+Another similar approach to TF-IDF that works well for this corpus is to look at all of the
+proper nouns that are the most common in each document. The code below takes the most common
+proper nouns (after removing some that appear in a very large number of every addresses).
+
+```{r}
+words_remove <- c("Senate", "House", "Representatives", "Congress", "United", "States",
+                  "Madam", "Speaker", "Mr.", "Vice", "President", "America", "Americans",
+                  "Members", "U.S.", "Members", "Gentlemen")
+temp <- filter(token, upos == "PROPN")
+temp <- filter(temp, !(token %in% words_remove))
+temp <- group_by(temp, doc_id)
+temp <- arrange(mutate(temp, cnt = n()), desc(cnt))
+temp <- slice_head(group_by(temp, doc_id), n = 7)
+temp <- summarize(temp, top_terms = paste(token, collapse = "; "))
+temp <- ungroup(temp)
+temp <- left_join(temp, meta, by = "doc_id")
+temp <- select(temp, short_label, top_terms)
+temp
+```
+
+Notice that there are some mistakes, but that this technique does give a good high-level
+description of what historical events are happening at the time of the address.
+
+## KWiC
+
+Sometimes we are interested in the way that a word is used, not just how often it is seen
+or how unique it is in the dataset. Once way to do this is through the technique called
+Keywords in Context (KWiC). The following code allows you to input a term and see all of
+the instances where the term is used in the data. The instances are aligned to make it 
+easy to see the different context of each term.
+
+```{r}
+query <- "immigrant"  # put any word you would like to explore here
+
+doc_t <- doc
+doc_t$text <- stri_replace_all(doc_t$text, " ", fixed = "\n")
+temp <- stri_locate_all(stri_trans_tolower(doc_t$text), fixed = query)
+temp <- tibble(doc_id = doc$doc_id, locs = lapply(temp, function(v) v[,1]))
+temp <- unnest(temp, cols = locs)
+temp <- filter(temp, !is.na(locs))
+temp <- left_join(temp, doc_t, by = "doc_id")
+temp$context <- stri_sub(temp$text, temp$locs - 30, temp$locs + 30)
+temp <- select(temp, short_label, context)
+temp <- slice_tail(temp, n = 1000)   # for safety; do not show more than 1000 results
+temp <- sprintf("%-18s|  %s", temp$short_label, temp$context)
+cat(temp, sep = "\n")
+```
+
+Try some different terms and see if you can see changes in their usage over time.
+
+## Dunn Log-Likelihood
+
+The Dunn Log-Likelihood, or G-squared, statistic is a way of measuring terms that
+most strongly differentiate between two sets of documents. The algorithm is balancing
+frequency (i.e. how often is the word used) in relation to signal (i.e. how indicative). 
+Here, we will start by picking two presidents and seeing what terms most strongly 
+differ between their  speeches. For reference, here are the "short" names of all 
+the presidents in our data (usually last name, except when ambiguous):
+
+```{r}
+unique(meta$short_name)
+```
+
+And here is the code that compares two presidents. To start, let's look at Obama
+and Kennedy:
+
+```{r}
+president_1 <- "Obama"
+president_2 <- "Kennedy"
+
+tf <- cnlp_utils_tf(filter(token, upos %in% c("NOUN", "ADJ", "ADV")))
+cnt1 <- apply(tf[meta$short_name == president_1,], 2, sum)
+cnt2 <- apply(tf[meta$short_name == president_2,], 2, sum)
+index <- which(pmin(cnt1, cnt2) > 0)
+cnt1 <- cnt1[index]
+cnt2 <- cnt2[index]
+
+tot1 <- sum(cnt1)
+tot2 <- sum(cnt2)
+e1 <- tot1 * (cnt1 + cnt2) / (tot1 + tot2)
+e2 <- tot2 * (cnt1 + cnt2) / (tot1 + tot2)
+ll <- 2 * (cnt1 * log(cnt1 / e1) + cnt2 * log(cnt2 / e2)) * sign(cnt1 * log(cnt1 / e1))
+pval <- 1 - pchisq(abs(ll), 1)
+scores <- matrix(round(as.numeric(ll), 2), ncol = 1)
+rownames(scores) <- names(ll)
+colnames(scores) <- "G-squared"
+scores <- scores[order(scores[,1], decreasing = TRUE),,drop=FALSE]
+rbind(head(scores, 15), tail(scores, 15))
+```
+
+At the top are the 15 terms most frequently associated with president one and the bottom are
+the 15 terms associated most strongly with president two. You can modify the selected presidents,
+the parts of speech, and choose to show more terms.
+
+Using a similar approach, we can identify the biggest differences between the start and end of
+a particular speech. The code below shows the terms most differentiating between the first half
+and the second half of Obama's 2009 speech.
+
+```{r}
+speech_label <- "Obama, 2009"
+pct_cut_off <- 50
+
+this_id <- filter(meta, short_label == speech_label)$doc_id
+temp <- filter(token, doc_id == this_id)
+temp <- mutate(temp, pid = if_else(pct_doc <= pct_cut_off, "first", "second"))
+tf <- cnlp_utils_tf(filter(temp, upos %in% c("NOUN", "ADJ", "ADV")), doc_var = "pid")
+cnt1 <- apply(tf[rownames(tf) == "first",,drop = FALSE], 2, sum)
+cnt2 <- apply(tf[rownames(tf) == "second",,drop = FALSE], 2, sum)
+index <- which(pmin(cnt1, cnt2) > 0)
+cnt1 <- cnt1[index]
+cnt2 <- cnt2[index]
+
+tot1 <- sum(cnt1)
+tot2 <- sum(cnt2)
+e1 <- tot1 * (cnt1 + cnt2) / (tot1 + tot2)
+e2 <- tot2 * (cnt1 + cnt2) / (tot1 + tot2)
+ll <- 2 * (cnt1 * log(cnt1 / e1) + cnt2 * log(cnt2 / e2)) * sign(cnt1 * log(cnt1 / e1))
+pval <- 1 - pchisq(abs(ll), 1)
+scores <- matrix(round(as.numeric(ll), 2), ncol = 1)
+rownames(scores) <- names(ll)
+colnames(scores) <- "G-squared"
+scores <- scores[order(scores[,1], decreasing = TRUE),,drop=FALSE]
+rbind(head(scores, 15), tail(scores, 15))
+```
+
+The earlier terms are at the top of the output and the later terms are at the
+bottom. As before, play around with changing the selected speech and see what
+comes out of the analysis.
+
+
+## Topic Models
+
+Another approach to studying a corpus of texts is to run a Topic Model on the
+data. The code below runs a model using nouns adjectives and adverbs with
+16 groups. It will take a few minutes to finish running.
+
+Change 'k = 'to the number of topics that you want to select.
+
+
+```{r}
+
+num_topics <- 16  # select number of topics here
+
+tf_matrix <- cnlp_utils_tf(
+  filter(token, upos %in% c("NOUN", "ADJ", "ADV")),
+  min_df = 0.01, max_df = 0.5
+)
+lda_model <- LDA(x = tf_matrix, k = num_topics, control = list(seed = 2811, verbose = 1)) 
+```
+
+Once the model finishes, we can extract the output and produce a new tidy dataset 
+containing all of the information about the topics.
+
+```{r}
+terms <- lda_model@terms
+beta <- lda_model@beta
+gamma <- lda_model@gamma
+top_k <- get_terms(lda_model, k = 5)
+
+topics <- tibble(
+  doc_id = rep(meta$doc_id, ncol(gamma)),
+  topic_num = as.numeric(col(gamma)),
+  prob = as.numeric(gamma)
+)
+topics$topic_name <- apply(top_k, 2, paste, collapse = "; ")[topics$topic_num]
+topics <- left_join(topics, meta, by = "doc_id")
+```
+
+There is a strong temporal component to the topic models, which we can see visually
+in the following graphic (the topics have been ordered from the "oldest" to the "newest"):
+
+```{r}
+temp <- filter(topics, prob > 0.01)
+temp <- mutate(group_by(temp, topic_name), my = mean(year))
+temp <- arrange(ungroup(temp), my)
+temp <- mutate(temp, topic_name = fct_inorder(topic_name))
+
+ggplot(data = temp, aes(x = year, y = topic_name)) +
+  geom_point(aes(size = prob, color = topic_name), show.legend = FALSE) +
+  scale_size_area()
+```
+
+We can also look at the documents most closely associated with each topic:
+
+```{r}
+temp <- filter(topics, prob > 0.1)
+temp <- mutate(group_by(temp, topic_name), my = mean(year))
+temp <- arrange(ungroup(temp), my)
+temp <- mutate(temp, topic_name = fct_inorder(topic_name))
+temp$label <- sprintf("%s (%d%%)", temp$short_label, round(temp$prob * 100))
+temp <- arrange(temp, desc(prob))
+split(temp$label, temp$topic_name)
+```
+
+As well as a further analysis of the words that are most closely associated with each
+topic:
+
+```{r}
+get_terms(lda_model, k = 20)  #change the number to see more or less words
+```
+
+You can use the topic modelling code in the first block to re-run the model with
+a different number of topics and see how it changes the output.
+
+## Principal Component Analysis
+
+As a final method, we will use a technique called principal component analysis (PCA) to
+show the relative "closeness" between the terms used in each document. The output
+of the analysis can be used to visualize the relationship between each document.
+To avoid creating too many labels, we will label only each president's first speech:
+
+```{r}
+tfidf <- cnlp_utils_tfidf(
+  filter(token, upos %in% c("NOUN", "ADJ", "ADV")),
+  min_df = 0.01, max_df = 0.5
+)
+temp <- mutate(sm_tidy_pca(tfidf), doc_id = as.numeric(document))
+temp <- left_join(temp, meta, by = "doc_id")
+temp_first <- temp[!duplicated(temp$short_name),]
+ggplot(data = temp, aes(x = v1, y = v2)) +
+  geom_point(aes(color = year), alpha = 0.3) +
+  geom_text_repel(aes(label = short_label), data = temp_first, size = 3) +
+  scale_color_viridis_c() +
+  theme_void()
+```
+
+Note that the x- and y-axes have no specific meaning; what matters is how close
+each dot is to one another.
+
+You can modify the parts of speech codes used in the analysis, investigate the
+overall temporal direction of the corpus, and see which presidents are most 
+closely connected based on the words used in their texts. 
+

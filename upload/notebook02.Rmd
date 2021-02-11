@@ -1,0 +1,256 @@
+---
+title: "Introduction to Data Visualization"
+output: html_document
+---
+
+# Getting Started
+
+Before running this notebook, select "Session > Restart R and Clear Output" in
+the menu above to start a new R session. This will clear any old data sets and
+give us a blank slate to start with.
+
+After starting a new session, run the following code chunk to load the
+libraries and data that we will be working with today.
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+
+theme_set(theme_minimal())
+
+movies <- read_csv(file.path("data", "movie_class.csv"))
+```
+
+I have set the options `include=FALSE` and `message=FALSE` to avoid cluttering
+the solutions with all the output from this code.
+
+# Data Vizualization
+
+## EDA
+In general, what we are going to be doing now is EDA, exploratory data analysis.
+As you read in the Arnold and Tilton reading:
+
+"While often not named, exploratory data analysis permeates the digital humanities.
+EDA, described in 1977 in John Tukey’s seminal work by the same name, is a
+subfield of statistics offering a conceptual structure for drawing information
+from data sources. It often evokes new hypotheses and guides statisticians toward a
+ppropriate techniques for further inferential modeling. Tukey championed these
+techniques after becoming concerned that a substantial amount of statistical
+analysis was conducted by blindly applying models without first considering
+their appropriateness. His work, and its subsequent expansions over the past
+forty-five years, helps lay out an approach for thinking critically about data
+analysis in the humanities. EDA is concerned with exploring data by iterating
+between summary statistics, modeling techniques, and visualizations."
+
+ Assumptions/objectives:
+
+ - an approach to analyzing data
+ - about exploring the data to then formulate hypotheses
+ - summarizing data to garner insights
+ - determine if new/other data is needed
+
+ So, how might we do this? We can use ggplot2!
+
+
+## Grammar of Graphics
+
+So, we are back to Arnold and Tilton:
+
+"Tukey’s work on EDA called for constructing visualizations, such as
+scatterplots, histograms, and box plots, to understand patterns within
+multivariate datasets. The field of data visualization builds on his work,
+treating visualizations as their own object of study.
+Jacques Bertin’s Semiology of Graphics, William Cleveland’s texts
+The Elements of Graphing Data and Visualizing Data, and Leland Wilkinson’s
+The Grammar of Graphics are foundational works in statistical graphics.
+Bertin argued that graphics “constitutes one of the basic sign-systems conceived
+by the human mind for the purposes of storing, understanding, and communicating
+essential information” (2). He showed explicitly how graphics can serve as their
+own form of argument and evidence. Cleveland built on Bertin’s work by
+theorizing a distinction between graphing, the process of visualizing raw data,
+and fitting, the process of visualizing transformed data and statistical models.
+Wilkinson extended Cleveland’s theory by distinguishing between the mathematical
+abstraction of a graph and the physical manifestation of a rendered graphic.
+He then set out to describe the fundamental units that comprised a visualization."
+
+So now let's get a quick overview of ggplot2:
+https://rfortherestofus.com/2019/07/a-short-overview-of-the-grammar-of-graphics/
+
+For those who would like to learn more, watch Leland Wilkinson talk about
+his work at an H20.ai event in NYC in 2019: https://www.youtube.com/watch?v=1X93Sum_SyM
+
+### Elements
+
+Data visualization is an incredibly important skill and a task that R is
+particularly well-designed for. We are going to learn and use the **ggplot2**
+package for building beautiful and informative graphics. The package makes it
+easy to build fairly complex graphics in a way that is guided by a general
+theory of data visualization. The only downside is that, because it is built
+around a theoretical model rather than many one-off solutions for different
+tasks, it has a steep initial learning curve. These notes will, hopefully,
+make this as painless as possible.
+
+The core idea of the grammar of graphics is that visualizations are composed
+of independent *layers*. To describe a specific layer, we need to specify
+several elements:
+
+- *data*: the data set from which data will be taken to construct the plot
+- *geom*: a description of what kinds of objects to plot (i.e., points, labels,
+or boxes)  
+- *aes*: a mapping from elements of the plot to columns in our data set (i.e.,
+the position on the x-axis or the color of our points); it stands for aesthetics
+
+You can describe virtually any type of visualization by putting together these
+elements.
+
+To show how to use the grammar of graphics, we will start by using the food
+data set introduced in the previous notes, with each row describing a particular
+item of food along with various nutritional information. The first plot we will
+make is a scatter plot that investigates the relationship between calories and
+the total fat (in grams) that are in a 100g portion of each food item. In the
+language of the grammar of graphics we can describe this with the following
+elements:
+
+- *data*: our data set is called `movie_class`
+- *geom*: we will build a plot with a points geometry; each row of data is
+represented by a point
+- *aes*: the x-axis will be associated with variables such as `budget` and the y-axis with
+`run_time`
+
+## Bar plots
+
+Let's get started by making sure we know what our data is.
+
+```{r}
+movies
+```
+
+Now, let's start exploring. Let's start with a bar chart.
+How many films won?
+
+```{r}
+ggplot(data = movies, aes(x = win)) +
+  geom_bar()
+```
+We should know the answer! However, doing some basic checks helps us make sources
+that our data is "clean" and that there aren't errors.
+
+Let's look at country_of_origin. Look about right?
+
+```{r}
+ggplot(data = movies, aes(x = country_of_origin)) +
+  geom_bar()
+```
+
+And how about genre? Any surprises?
+
+```{r}
+ggplot(data = movies, aes(x = genre)) +
+  geom_bar()
+```
+
+Let's make this a bit easier to read!
+
+```{r}
+ggplot(data = movies, aes(x = fct_infreq(genre))) +   # order by frequency of genre
+  geom_bar() +                                        # create bar plot
+  coord_flip() +                                      # flip the axes
+  labs(x = "Count", y = "Genre")                      # add axis labels
+```
+
+When we are doing EDA, we often won't add labels. We usually know pretty well
+what the variables are. However, before circulating, we want to provide labels.
+
+## Scatter plot
+
+Often, we want not to just look at 1 variable, but want to look at the relationship
+between two or more variables. This will open up more questions!
+
+For example, might there be a relationship between a movie's budget and how much the
+film earns at the box office?
+
+```{r}
+ggplot(data = movies, aes(x = boxoffice, y = budget)) +
+  geom_point()
+```
+
+Any trends among the best picture winners?
+
+```{r}
+ggplot(data = movies, aes(x = budget, y = boxoffice, color = win)) +
+  geom_point()
+```
+
+Can we see other patterns if we add film run time to our analysis?
+
+```{r}
+ggplot(data = movies, aes(x = budget, y = boxoffice, color = win, size = run_time)) +
+  geom_point()
+```
+
+Can this data give us any insights into when to release the film if
+a studio wants major box office returns?
+
+```{r}
+ggplot(movies, aes(x = date_released, y = boxoffice)) +
+  geom_point()
+```
+
+## Labels
+
+Before we share our findings, it's important to think about the information
+that the viewer needs to interpret the visualization.
+
+```{r}
+ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
+  geom_text()
+```
+
+```{r}
+ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
+  geom_text_repel()
+```
+
+
+## Highlighting subsets of the data
+
+Often, we want to highlight a part of the data. We can do that by selecting a
+subset and then plotting.
+
+Let's take a look at the winners!
+
+```{r}
+movies_subset <- filter(movies, win %in% c("Y"))
+
+ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
+  geom_point(color = "grey85") +
+  geom_point(data = movies_subset, color = "olivedrab") +
+  geom_text_repel(data = movies_subset, color = "olivedrab")
+```
+
+More colors! http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf
+
+
+Let's take a look at the biographical films.
+
+
+```{r}
+movies_subset <- filter(movies, genre %in% c("biographical"))
+
+ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
+  geom_point(color = "grey85") +
+  geom_point(data = movies_subset, color = "lightpink1") +
+  geom_text_repel(data = movies_subset, color = "lightpink1")
+```
+
+
+Let's take a random sample (say 15) and visualize them.
+
+```{r}
+movies_subset <- slice_sample(movies, n = 15)
+
+ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
+  geom_point(color = "grey85") +
+  geom_point(data = movies_subset, color = "goldenrod1") +
+  geom_text_repel(data = movies_subset, color = "goldenrod1")
+```

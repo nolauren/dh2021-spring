@@ -1,0 +1,42 @@
+movie_title,director,country_of_origin,date_released,run_time,budget,boxoffice,color,win,genre
+Parasite,Bong Joon-Ho,KOR,2019-05-21,132,11,257.50,1,Y,comedy
+Ford v Ferrari,James Mangold,US,2019-08-30,152,98,225.50,1,N,action
+The Irishman,Martin Scorsese,US,2019-09-27,210,159,8.00,1,N,crime
+Jojo Rabbit,Taika Wititi,ZNL,2019-09-08,108,14,90.30,1,N,war
+Joker,Todd Phillips ,US,2019-10-04,122,55,"1,074.00",1,N,thriller
+Little Women,Greta Gerwig,US,2019-12-15,135,40,206.00,1,N,drama
+Marriage Story,Noah Baumbach,US,2019-08-29,137,18,2.30,1,N,romance
+1917,Sam Mendes,US,2019-12-04,119,95,385.30,1,N,drama
+Once Upon a Time in Hollywood,Quentin Tarantino,US,2019-07-26,160,90,374.30,1,N,drama
+Black Panther,Ryan Coogler,US,2018-02-16,134,200,"1,344.00",1,N,science fiction
+BlacKkKlansman,Spike Lee,US,2018-05-14,135,15,93.40,1,N,biographical
+Bohemian Rhapsody,Bryan Singer,US,2018-10-23,134,50,903.70,1,N,biographical
+The Favourite,Yorgos Lanthimos,US,2018-07-29,120,15,95.90,1,N,comedy
+Roma,Alfonso Cuaron,MX,2018-08-30,135,15,5.10,0,N,drama
+Green Book,Peter Farrelly,US,2018-09-11,130,23,327.90,1,Y,historical
+A Star Is Born,Bradley Cooper,US,2018-08-31,136,36,436.20,1,N,drama
+Vice,Adam McKay,US,2018-12-11,132,60,76.10,1,N,biographical
+Call Me by Your Name,Luca Guadagnino,IT,2017-01-22,132,4,41.90,1,N,drama
+The Shape of Water,Guillermo del Toro,US,2017-08-31,123,20,195.30,1,Y,fantasy
+Darkest Hour,Joe Wright,US,2017-09-01,125,30,150.90,1,N,historical
+Dunkirk,Christopher Nolan,UK,2017-07-13,106,125,526.90,1,N,historical
+Lady Bird,Greta Gerwig,US,2017-09-01,93,10,79.00,1,N,drama
+Phantom Thread,Paul Thomas Anderson,US,2017-12-11,130,35,47.80,1,N,drama
+The Post,Steven Spielberg,US,2017-12-14,116,50,179.80,1,N,historical
+Moonlight,Barry Jenkins,US,2016-09-02,111,3,65.30,1,Y,drama
+Arrival,Denis Villeneuve,US,2016-09-01,116,47,203.40,1,N,science fiction
+Fences,Denzel Washington,US,2016-12-15,139,24,64.40,1,N,historical
+Hacksaw Ridge,Mel Gibson,US,2016-09-04,139,40,180.40,1,N,biographical
+Hell or High Water,David Mackenzie,US,2016-05-16,102,12,37.90,1,N,western
+Hidden Figures,Theodore Melfi,US,2016-12-10,127,25,236.00,1,N,biographical
+La La Land,Damien Chazelle,US,2016-08-31,128,30,446.50,1,N,musical
+Lion,Garth Davis,AU,2016-09-10,118,12,140.30,1,N,western
+Manchester by the Sea,Kenneth Lonergan,US,2016-01-23,137,9,79.00,1,N,drama
+The Big Short,Adam McKay,US,2015-11-12,130,50,133.40,1,N,drama
+Bridge of Spies,Steven Spielberg,US,2015-11-26,141,40,165.50,1,N,drama
+Brooklyn,John Crowley,UK,2015-11-06,112,11,62.10,1,N,drama
+Mad Max: Fury Road,George Miller,US,2015-05-07,120,150,375.20,1,N,action
+The Martian,Ridley Scott,US,2015-09-11,130,108,630.20,1,N,science fiction
+The Revenant,Alejandro Iñárritu,US,2015-12-16,156,135,533.00,1,N,action
+Room,Leonard Abrahamson,CA,2015-09-04,118,13,36.30,1,N,drama
+Spotlight,Thomas McCarthy,US,2015-09-03,129,20,98.30,1,Y,drama

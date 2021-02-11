@@ -1,0 +1,325 @@
+---
+title: "Notebook 05"
+output: html_document
+---
+
+## Getting Started
+
+Before running this notebook, select "Session > Restart R and Clear Output" in
+the menu above to start a new R session. This will clear any old data sets and
+give us a blank slate to start with.
+
+After starting a new session, run the following code chunk to load the
+libraries and data that we will be working with today.
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+
+make_scopus_graph_data <- function(input)
+{
+  cites_sub <- semi_join(cites, input, by = c("id_citing" = "id"))
+  cites_sub <- semi_join(cites_sub, input,  by = c("id_cited" = "id"))
+  set.seed(1)
+  graph <- sm_graph_layout(cites_sub)
+  nodes <- inner_join(inner_join(scotus, graph$node, by = "id"), gr_all, by = "id")
+  nodes$cluster_all <- as.character(nodes$cluster_all)
+  edges <- graph$edge
+  return(list(nodes = nodes, edges = edges))
+}
+```
+
+## Supreme Court Data
+
+The Supreme Court, the highest court in the United States, is the most powerful
+part of the judiciary branch. Many stakeholders are interested
+in learning about patterns in the Supreme Court. They pose questions such as:
+
+- Are certain kinds of law decided during certain periods of time?
+- Are contentious cases more central than others? In other words, are the
+important cases the ones where judges agree or disagree?
+- Which area of the law does the case reflect (according to the WUSTL categories)?
+- Which cases are central to case law?
+- Which cases are more likely to cited with each other?
+- Which cases connect different areas of the law?
+
+Let's read in our data.
+
+```{r, message=FALSE}
+scotus <- read_csv(file.path("data", "scotus_dh.csv"))
+cites <- read_csv(file.path("data", "scotus_cites_dh.csv"))
+gr_all <- read_csv(file.path("data", "scotus_gr_all_dh.csv"))
+```
+
+Let's take a look at the data.
+
+- term: Term of the decision.
+- chief: The chief justice during the case.
+- win_ideology: The ideology of the decision (liberal vs conservative)
+- win_party: If favorable, the decision aligns with the win_ideology
+- issue: The number of the area assigned by Washington University in St. Louis (more info below).
+- issue_area: The name of the category assigned by Washington University in St. Louis (more info below)
+
+```{r, message=FALSE}
+scotus
+```
+In order to build networks, we need an edge list. The first (id_citing) is the 
+court case cited by the other court case (id_cited).
+
+```{r, message=FALSE}
+cites
+```
+
+Before we do some network analysis, let's just count how often each case is cited 
+(i.e. what we call the "degree" in network analysis). So, we can see 1965-122 is
+the most cited case. What is the case?
+
+```{r}
+counts <- count(cites, id_cited, sort = TRUE)
+counts <- left_join(counts, scotus, by = c("id_cited" = "id"))
+counts
+```
+### Selecting Issues
+
+In order to identify areas of that law that cases address,
+Washington University in St. Louis assigned each United States Supreme Court
+case to a legal issue (ex. desegregation).
+The [code book](http://scdb.wustl.edu/documentation.php?s=1) lists the corresponding
+issue assigned [each issue number in the data set](https://github.com/introdh2016/response3_network/blob/master/ussc-31.zip). 
+
+
+```{r}
+scotus_sub <- filter(scotus, issue %in% c(20130)) # Change to take a look at an area.
+gr <- make_scopus_graph_data(scotus_sub)
+nodes <- gr$nodes
+edges <- gr$edges
+```
+
+Let's take a look at code 20130: Civil Rights.
+
+```{r}
+nodes
+```
+
+### Plotting Metadata
+
+Let's do some EDA with ggplot to better understand our data.
+We are just going to focus on 20130.
+
+Let's try to get a sense if cases are contentious by looking at the minor votes.
+
+```{r}
+ggplot(nodes) +
+  geom_bar(aes(x = minor_votes))
+```
+
+Let's now take a look the ideology of the decision. 
+
+```{r}
+ggplot(nodes) +
+  geom_bar(aes(x = win_party, fill = win_ideology), position = "dodge")
+```
+
+
+Finally, let's explore when these cases took place and under which court.
+
+```{r}
+ggplot(nodes) +
+  geom_point(aes(x = term, y = minor_votes, color = chief), size = 2) +
+  scale_color_viridis_d()
+```
+
+## Network Analysis
+
+Now that we've done some EDA, let's explore networks. We are still just looking at civil rights cases. Our edge list connects a case to the case that it cited. 
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(fill = "black", size = 3.5, show.legend = FALSE, pch=21) +
+  theme_void()
+```
+
+Let's add a label to better understand the network.
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(size = 2, show.legend = FALSE) +
+  geom_text_repel(aes(label = id), size = 2) +
+  theme_void()
+```
+
+Let's say we want to begin to figure out what each of these cases are. We can!
+
+```{r}
+filter(nodes, id == "2017-020")
+```
+
+### Metadata
+
+We can now use the metadata about the case to garner further insights. Remember
+how we could see during EDA that the Burger court was a time when a lot of cases
+were decided. We can incorporate that knowledge into our network. 
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = chief), size = 3.5, pch=21) +    # you can change the "fill = " to other variables
+  theme_void()
+```
+
+### Centrality
+
+Often we are very interested in the center of a network. This helps us identify
+the most important node/ vertices in a network. In other words, it helps us see
+which nodes are highly connected, which reveals that they have a close
+relationship. 
+
+#### Eigenvalue Centrality
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = eigen), size = 3.5, show.legend = FALSE, pch=21) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_void()
+```
+
+Now, let's figure out which of the court cases have the highest centrality. 
+So, which cases are all those red and organ nodes?
+
+```{r}
+arrange(nodes, desc(eigen))
+```
+
+
+Now, let's look at the centrality if we were to look at all of the cases in our
+data set. What this tells us is that the case represented by the red node is the
+most cited from this cluster within the entire data set. 
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = eigen_all), size = 3.5, show.legend = FALSE, pch=21) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_void()
+```
+
+So, let's figure out the exact case.
+
+```{r}
+arrange(nodes, desc(eigen_all))
+```
+
+#### Betweeness Centrality
+
+While it's great to understand which cases are central, we also often want to know 
+which case gets us from one area to another. In other words, which cases connects
+us to another area/ community.
+
+So, let's see which cases is a bridge within our network.
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = between), size = 3.5, show.legend = FALSE, pch=21) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_void()
+```
+
+Let's figure out the cases.
+
+```{r}
+arrange(nodes, desc(between))
+```
+
+Now, let's see which cases are a bridge with all the cases. 
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = between_all), size = 3.5, show.legend = FALSE, pch=21) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_void()
+```
+
+```{r}
+arrange(nodes, desc(between_all))
+```
+
+
+### Clusters
+
+Let's now take a look at the cases that are very clustered together. This indicates
+cases that are citing each other.
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = cluster), size = 3.5, pch=21) +
+  theme_void()
+```
+
+Let's look at the cases that comprise each cluter.
+
+```{r}
+split(sprintf("%s (%d)", nodes$case_name, nodes$term), nodes$cluster)
+```
+
+Now, let's look at clusters in relation to all of the data. 
+
+```{r}
+ggplot(nodes, aes(x, y)) +
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend), alpha = 0.1, data = edges) +
+  geom_point(aes(fill = cluster_all), size = 3.5, pch=21) +
+  theme_void()
+```
+
+Let's look at the exact cases.
+
+```{r}
+split(sprintf("%s (%d)", nodes$case_name, nodes$term), nodes$cluster)
+```
+
+## Other methods for picking cases
+
+Now, you can do EDA and networks with the rest of the cases. 
+
+### Important Overall Cases
+
+This data will look at the entire data set.
+
+```{r}
+num_cases <- 50
+scotus_sub <- left_join(scotus, gr_all, by = "id")
+scotus_sub <- arrange(scotus_sub, desc(eigen_all))
+scotus_sub <- filter(scotus_sub, component_all == 1)
+scotus_sub <- slice_head(scotus_sub, n = num_cases)
+gr <- make_scopus_graph_data(scotus_sub)
+nodes <- gr$nodes
+edges <- gr$edges
+```
+
+### Important Within Issue Area
+
+This data will look at an issue_area. This aggregates all of the cases under an area
+such as Civil Rights. 
+
+```{r}
+num_cases <- 50
+scotus_sub <- left_join(scotus, gr_all, by = "id")
+scotus_sub <- filter(scotus_sub, issue_area == "Civil Rights")
+scotus_sub <- arrange(scotus_sub, desc(eigen_all))
+scotus_sub <- filter(scotus_sub, component_all == 1)
+scotus_sub <- slice_head(scotus_sub, n = num_cases)
+gr <- make_scopus_graph_data(scotus_sub)
+nodes <- gr$nodes
+edges <- gr$edges
+```

@@ -1,0 +1,179 @@
+---
+title: "Notebook 10"
+output: html_document
+---
+
+## Getting Started
+
+Before running this notebook, select "Session > Restart R and Clear Output" in
+the menu above to start a new R session. This will clear any old data sets and
+give us a blank slate to start with.
+
+After starting a new session, run the following code chunk to load the
+libraries and data that we will be working with today.
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+## Movies Data
+
+
+For our data, we are going to look at the top 20 grossing films
+for the last 20 years (2000-2019). We have several valuables, they include:
+
+- genre: the least common attached to the film from IMDB (tends to be the most unique)
+- mpa: Motion Picture Association rating
+- runtime: duration of the film in minutes
+- gross: amount of money in U.S. dollars per million
+- rating_count: the number of people who rated the film on IMDB
+- rating: IMDB rating, out of 10
+- metacritic: rating form Metacritic, out of 100
+- poster_brigthness: how bright the color is in the movie poster
+
+
+So now, let's read in our data.
+
+
+```{r, message=FALSE}
+movies <- read_csv(file.path("data", "movies_top_20_2000_2019.csv"))
+head(movies)
+```
+
+
+### One-variable plots
+
+Let's take an initial look at one variable. Along with helping
+us begin to understand our data, this also allows us to do some checks
+to make sure our data looks accurate.
+
+Let's explore the MPA ratings.
+
+```{r}
+ggplot(data = movies, aes(x = mpa)) +
+  geom_bar()
+```
+
+Let's explore the film's by genre.
+
+```{r}
+ggplot(data = movies, aes(x = genre)) +
+  geom_bar() +
+  coord_flip()
+```
+
+Let's explore the film by IMDB ratings. (They are out of 10.)
+
+```{r}
+ggplot(data = movies, aes(x = rating)) +
+  geom_bar()
+```
+
+
+### Two-variable plots
+
+While it's nice to explore by one variable, often we want to look at variables
+in relation to another. This allows us to start asking more complex questions
+about the data as well as to see more nuanced patterns.
+
+
+For each one, think about what you'd expect to see before making the plot.
+Once you've made the graph, ask yourself:
+- Does the graph support that initial expectation?
+- Make you ask a different question/ set of questions?
+- See a different pattern?
+
+Let's explore how many people gave a rating on IMDB in relation to
+the average rating from the community.
+
+```{r}
+ggplot(data = movies, aes(x = rating_count, y = rating)) +
+  geom_point()
+```
+
+Let's explore how much the film made in relation to the IMDB rating.  
+
+```{r}
+ggplot(data = movies, aes(x = gross, y = rating)) +
+  geom_point()
+```
+
+Let's explore the IMDB community's rating in relation to genre.  
+
+
+```{r}
+ggplot(data = movies, aes(x = rating, y = genre)) +
+  geom_count() +
+  scale_size_area(max_size = 4)
+```
+
+Let's explore the rating in relation to the genre.  
+
+```{r}
+ggplot(data = movies, aes(x = mpa, y = genre)) +
+  geom_count() +
+  scale_size_area(max_size = 4)
+```
+
+## Label subsets
+
+
+An important part of data viz, it thinking through all the pieces that we can use to better
+communicate our findings/arguments.  Labels are one way.
+
+Let's take a look at specific films.
+
+```{r}
+movie_subset <- filter(
+  movies,
+  title %in% c("Black Panther", "The Lord of the Rings: The Return of the King", "The Martian")
+)
+
+ggplot(data = movies, aes(x = gross, y = rating)) +
+  geom_point(color = "grey95") +
+  geom_point(data = movie_subset, color = "salmon") +
+  geom_text_repel(aes(label = title), data = movie_subset, color = "salmon")
+```
+
+Let's take a look at a random set of movies (this case 15).
+
+```{r}
+movie_subset <- slice_sample(movies, n = 15)
+
+ggplot(data = movies, aes(x = gross, y = rating)) +
+  geom_point(color = "grey95") +
+  geom_point(data = movie_subset, color = "salmon") +
+  geom_text_repel(aes(label = title), data = movie_subset, color = "salmon")
+```
+
+
+Let's take a look at the top 10 grossing films.
+
+
+```{r}
+movie_subset <- arrange(movies, desc(gross))
+movie_subset <- slice_head(movie_subset, n = 10)
+
+ggplot(data = movies, aes(x = gross, y = rating)) +
+  geom_point(color = "grey95") +
+  geom_point(data = movie_subset, color = "salmon") +
+  geom_text_repel(aes(label = title), data = movie_subset, color = "salmon")
+```
+
+
+Let's take a look at the crime films.
+
+
+```{r}
+movie_subset <- filter(movies, genre == "Crime")
+
+ggplot(data = movies, aes(x = gross, y = rating)) +
+  geom_point(color = "grey95") +
+  geom_point(data = movie_subset, color = "salmon") +
+  geom_text_repel(aes(label = title), data = movie_subset, color = "salmon")
+```
