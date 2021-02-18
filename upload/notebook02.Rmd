@@ -103,11 +103,7 @@ the position on the x-axis or the color of our points); it stands for aesthetics
 You can describe virtually any type of visualization by putting together these
 elements.
 
-To show how to use the grammar of graphics, we will start by using the food
-data set introduced in the previous notes, with each row describing a particular
-item of food along with various nutritional information. The first plot we will
-make is a scatter plot that investigates the relationship between calories and
-the total fat (in grams) that are in a 100g portion of each food item. In the
+To show how to use the grammar of graphics, we will start by using movie data. In the
 language of the grammar of graphics we can describe this with the following
 elements:
 
