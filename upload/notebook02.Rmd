@@ -202,9 +202,9 @@ ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
   geom_text()
 ```
 
-```{r}
+```{r, warning=FALSE}  
 ggplot(data = movies, aes(x = budget, y = boxoffice, label = movie_title)) +
-  geom_text_repel()
+  geom_text_repel() + geom_point()
 ```
 
 
