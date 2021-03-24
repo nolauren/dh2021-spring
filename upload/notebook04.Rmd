@@ -304,7 +304,6 @@ data. The code below runs a model using nouns adjectives and adverbs with
 
 Change 'k = 'to the number of topics that you want to select.
 
-
 ```{r}
 
 num_topics <- 16  # select number of topics here
@@ -313,48 +312,18 @@ tf_matrix <- cnlp_utils_tf(
   filter(token, upos %in% c("NOUN", "ADJ", "ADV")),
   min_df = 0.01, max_df = 0.5
 )
-lda_model <- LDA(x = tf_matrix, k = num_topics, control = list(seed = 2811, verbose = 1)) 
+lda_model <- sm_lda_topics(tf_matrix, num_topics = num_topics)
+topic_docs <- left_join(mutate(lda_model$docs, doc_id = as.numeric(doc_id)), meta, by = "doc_id")
+topic_terms <- lda_model$terms
 ```
 
-Once the model finishes, we can extract the output and produce a new tidy dataset 
-containing all of the information about the topics.
+We can look at the documents most closely associated with each topic:
 
 ```{r}
-terms <- lda_model@terms
-beta <- lda_model@beta
-gamma <- lda_model@gamma
-top_k <- get_terms(lda_model, k = 5)
-
-topics <- tibble(
-  doc_id = rep(meta$doc_id, ncol(gamma)),
-  topic_num = as.numeric(col(gamma)),
-  prob = as.numeric(gamma)
-)
-topics$topic_name <- apply(top_k, 2, paste, collapse = "; ")[topics$topic_num]
-topics <- left_join(topics, meta, by = "doc_id")
-```
-
-There is a strong temporal component to the topic models, which we can see visually
-in the following graphic (the topics have been ordered from the "oldest" to the "newest"):
-
-```{r}
-temp <- filter(topics, prob > 0.01)
-temp <- mutate(group_by(temp, topic_name), my = mean(year))
+temp <- filter(topic_docs, prob > 0.1)
+temp <- mutate(group_by(temp, topic), my = mean(year))
 temp <- arrange(ungroup(temp), my)
-temp <- mutate(temp, topic_name = fct_inorder(topic_name))
-
-ggplot(data = temp, aes(x = year, y = topic_name)) +
-  geom_point(aes(size = prob, color = topic_name), show.legend = FALSE) +
-  scale_size_area()
-```
-
-We can also look at the documents most closely associated with each topic:
-
-```{r}
-temp <- filter(topics, prob > 0.1)
-temp <- mutate(group_by(temp, topic_name), my = mean(year))
-temp <- arrange(ungroup(temp), my)
-temp <- mutate(temp, topic_name = fct_inorder(topic_name))
+temp <- mutate(temp, topic_name = fct_inorder(sprintf("%02d", topic)))
 temp$label <- sprintf("%s (%d%%)", temp$short_label, round(temp$prob * 100))
 temp <- arrange(temp, desc(prob))
 split(temp$label, temp$topic_name)
@@ -364,7 +333,51 @@ As well as a further analysis of the words that are most closely associated with
 topic:
 
 ```{r}
-get_terms(lda_model, k = 20)  #change the number to see more or less words
+num_words <- 10  # select number of words here
+
+temp <- group_by(topic_terms, topic)
+temp <- arrange(temp, desc(beta))
+temp <- slice_head(temp, n = num_words)
+sapply(split(temp$token, temp$topic), function(v) paste(v, sep  = "; "))
+```
+ 
+ This is one way to explore these topics. However, we can also use a very cool
+ interface developed by Taylor Arnold (https://statsmaths.github.io) to explore. 
+ To do this, we will take our results and turn them into a json file. 
+ A json file is another data format similar to a CSV that is popular on the web. 
+
+Let's create the json file.
+
+```{r}
+source("topic.R")
+
+topic_json <- topics_create_json(topic_docs, topic_terms, doc, "short_label", truncate = 1000L)
+write_json(topic_json, "sotu-topics.json")
+```
+
+Then, let's download it. We can do this by going to Files on the right.
+You'll see a new file called "sotu-topics.json. Download it to your computer.
+
+Then, visit the following site to upload the json file:
+
+https://statsmaths.github.io/topic-explo/build/
+
+
+
+There are also other kinds of analysis that still require us to return to ggplot
+in R. There is a strong temporal component to the topic models, which we can
+see visually in the following graphic (the topics have been ordered from the
+"oldest" to the "newest"):
+
+```{r}
+temp <- filter(topic_docs, prob > 0.01)
+temp <- mutate(group_by(temp, topic), my = mean(year))
+temp <- arrange(ungroup(temp), my)
+temp <- mutate(temp, topic_name = fct_inorder(sprintf("%02d", topic)))
+
+ggplot(data = temp, aes(x = year, y = topic_name)) +
+  geom_point(aes(size = prob, color = topic_name), show.legend = FALSE) +
+  scale_size_area()
 ```
 
 You can use the topic modelling code in the first block to re-run the model with
