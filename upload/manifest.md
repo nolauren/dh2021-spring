@@ -6,3 +6,4 @@ notebook03.Rmd
 notebook04.Rmd
 data/sotu_document.csv.gz
 data/sotu_token.csv.gz
+topic.R
