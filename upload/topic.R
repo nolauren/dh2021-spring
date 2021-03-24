@@ -1,7 +1,7 @@
 library(jsonlite)
 library(tidyverse)
 
-topics_create_json <- function(topic_docs, topic_terms, meta, truncate = -1)
+topics_create_json <- function(topic_docs, topic_terms, meta, name_col, truncate = -1)
 {
 
   tnames <- topic_terms %>%
@@ -32,7 +32,15 @@ topics_create_json <- function(topic_docs, topic_terms, meta, truncate = -1)
     filter(prob > 0) %>%
     ungroup()
 
+  name_lookup <- meta[,c("doc_id", name_col)]
+  names(name_lookup) <- c("doc_id", "title")
+  name_lookup <- group_by(name_lookup, doc_id, title) %>%
+    summarise(n = n()) %>%
+    ungroup()
+  
   dset <- sort(unique(topic_docs$doc_id))
+  index <- match(dset, name_lookup$doc_id)
+  dset_title <-  name_lookup$title[index]
   top_docs$id <- match(top_docs$doc_id, dset) - 1L
 
   tset <- sort(unique(topic_terms$topic))
@@ -67,7 +75,7 @@ topics_create_json <- function(topic_docs, topic_terms, meta, truncate = -1)
     docs[[j]] <- list(
       "top_topics_ids" = top_topics$id[top_topics$doc_id == dset[j]],
       "topic_weights" = top_topics$prob[top_topics$doc_id == dset[j]],
-      "title" = unbox(dset[j]),
+      "title" = unbox(dset_title[j]),
       "text" = meta$text[meta$doc_id == dset[j]],
       "meta" = list()
     )
