@@ -8,6 +8,6 @@ notebook05.Rmd
 data/sotu_document.csv.gz
 data/sotu_token.csv.gz
 topic.R
-scotus_cites_dh.csv
-scotus_dh.csv
-scotus_gr_all_dh.csv
+data/scotus_cites_dh.csv
+data/scotus_dh.csv
+data/scotus_gr_all_dh.csv
